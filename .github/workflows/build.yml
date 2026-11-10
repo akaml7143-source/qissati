@@ -1,5 +1,5 @@
 
-name: Build MY STORY APK
+name: Build moon APK
 
 on:
   workflow_dispatch:
@@ -27,7 +27,11 @@ jobs:
           channel: stable
 
       - name: Create Android platform
-        run: flutter create --platforms=android --org com.qissati .
+        run: flutter create --platforms=android --org com.qissati --project-name moon .
+
+      - name: Set application name
+        run: |
+          sed -i 's/android:label="[^"]*"/android:label="moon"/' android/app/src/main/AndroidManifest.xml
 
       - name: Install dependencies
         run: flutter pub get
@@ -38,5 +42,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MY-STORY-APK
+          name: moon-APK
           path: build/app/outputs/flutter-apk/app-release.apk
