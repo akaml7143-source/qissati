@@ -1,5 +1,6 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'screens/story_page.dart';
@@ -7,6 +8,16 @@ import 'screens/settings_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.black,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.black,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
+
   runApp(const MyStoryApp());
 }
 
@@ -18,16 +29,16 @@ class MyStoryApp extends StatefulWidget {
 }
 
 class MyStoryAppState extends State<MyStoryApp> {
-  ThemeMode themeMode = ThemeMode.light;
+  ThemeMode themeMode = ThemeMode.dark;
 
-  Color accentColor = const Color(0xFFF1AFCB);
+  Color accentColor = const Color(0xFFD4AF37);
 
   double fontSize = 19;
 
   Locale locale = const Locale('ar');
 
   final List<Color> colors = const [
-    Color(0xFFF1AFCB),
+    Color(0xFFD4AF37),
     Color(0xFF176B70),
     Color(0xFF303B78),
     Color(0xFF1B4332),
@@ -35,15 +46,21 @@ class MyStoryAppState extends State<MyStoryApp> {
   ];
 
   void changeTheme(ThemeMode value) {
-    setState(() => themeMode = value);
+    setState(() {
+      themeMode = value;
+    });
   }
 
   void changeColor(Color value) {
-    setState(() => accentColor = value);
+    setState(() {
+      accentColor = value;
+    });
   }
 
   void changeFontSize(double value) {
-    setState(() => fontSize = value);
+    setState(() {
+      fontSize = value.clamp(14, 32);
+    });
   }
 
   void changeLanguage(String value) {
@@ -56,8 +73,7 @@ class MyStoryAppState extends State<MyStoryApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-
-      title: 'MY STORY',
+      title: 'moon',
 
       locale: locale,
 
@@ -77,20 +93,37 @@ class MyStoryAppState extends State<MyStoryApp> {
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.light,
-        scaffoldBackgroundColor: const Color(0xFFFFF8FB),
+        scaffoldBackgroundColor: const Color(0xFFFFFDF7),
         colorScheme: ColorScheme.fromSeed(
           seedColor: accentColor,
           brightness: Brightness.light,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFFFFFDF7),
+          foregroundColor: Colors.black,
+          centerTitle: true,
         ),
       ),
 
       darkTheme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
+        scaffoldBackgroundColor: Colors.black,
         colorScheme: ColorScheme.fromSeed(
           seedColor: accentColor,
           brightness: Brightness.dark,
+        ).copyWith(
+          primary: accentColor,
+          secondary: accentColor,
+          surface: const Color(0xFF111111),
         ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.black,
+          foregroundColor: accentColor,
+          centerTitle: true,
+          elevation: 0,
+        ),
+        dividerColor: const Color(0xFF806B2B),
       ),
 
       home: StoryPage(
@@ -116,4 +149,3 @@ class MyStoryAppState extends State<MyStoryApp> {
     );
   }
 }
-
