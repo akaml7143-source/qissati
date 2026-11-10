@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "859033029249",
+    "project_id": "moon-messenger-32db3",
+    "storage_bucket": "moon-messenger-32db3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:859033029249:android:e985005dcc5683e9c7db80",
+        "android_client_info": {
+          "package_name": "com.qissati.moon"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADHqKfVm2ZZ0kuaTa7vXJPPePlPKTAH1M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
