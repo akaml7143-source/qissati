@@ -1,7 +1,6 @@
 
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'chat_page.dart';
@@ -23,8 +22,20 @@ class StoryPage extends StatefulWidget {
 }
 
 class _StoryPageState extends State<StoryPage> {
-  static const Color gold = Color(0xFFD4AF37);
-  static const String drawingKey = 'moon_story_drawing_v1';
+  static const String sessionKey = 'moon_tasbih_session';
+  static const String dailyKey = 'moon_tasbih_daily';
+  static const String totalKey = 'moon_tasbih_total';
+  static const String dateKey = 'moon_tasbih_date';
+
+  static const int dailyTarget = 1000;
+
+  int sessionCount = 0;
+  int dailyCount = 0;
+  int totalCount = 0;
+
+  bool loading = true;
+
+  Color get accent => widget.accentColor;
 
   static const String story = '''
 خلال إحدى الرحلات في القطار، صاح شاب في العشرين من العمر فجأة:
@@ -47,127 +58,118 @@ class _StoryPageState extends State<StoryPage> {
 لكلّ شخصٍ منّا قصة، فلا تحكم على الآخرين قبل أن تعرفهم جيّدًا...قد تدهشك الحقيقة عنهم.
 ''';
 
-  final List<List<Offset>> strokes = [];
-  List<Offset> currentStroke = [];
-
-  final List<_StoryScene> scenes = const [
-    _StoryScene(
-      title: 'رحلة القطار',
-      icon: Icons.train_rounded,
-      secondIcon: Icons.airline_seat_recline_normal,
-      description: 'بداية الرحلة داخل القطار',
-    ),
-    _StoryScene(
-      title: 'الأشجار',
-      icon: Icons.forest_rounded,
-      secondIcon: Icons.park_rounded,
-      description: 'الشاب يرى الأشجار للمرة الأولى',
-    ),
-    _StoryScene(
-      title: 'الغيوم',
-      icon: Icons.cloud_rounded,
-      secondIcon: Icons.wb_sunny_rounded,
-      description: 'الغيوم في السماء',
-    ),
-    _StoryScene(
-      title: 'الطبيب',
-      icon: Icons.medical_services_rounded,
-      secondIcon: Icons.local_hospital_rounded,
-      description: 'الحديث عن الطبيب والمستشفى',
-    ),
-    _StoryScene(
-      title: 'عودة البصر',
-      icon: Icons.visibility_rounded,
-      secondIcon: Icons.favorite_rounded,
-      description: 'الحقيقة التي غيّرت نظرة الجميع',
-    ),
-  ];
+  String todayKey() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
 
   @override
   void initState() {
     super.initState();
-    loadDrawing();
+    loadCounters();
   }
 
-  Future<void> loadDrawing() async {
+  Future<void> loadCounters() async {
     final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(drawingKey);
 
-    if (saved == null || !mounted) return;
+    final savedDate = prefs.getString(dateKey);
+    final today = todayKey();
 
-    try {
-      final decoded = jsonDecode(saved) as List;
-      final loadedStrokes = decoded.map<List<Offset>>((stroke) {
-        return (stroke as List).map<Offset>((point) {
-          final values = point as List;
-          return Offset(
-            (values[0] as num).toDouble(),
-            (values[1] as num).toDouble(),
-          );
-        }).toList();
-      }).toList();
+    int savedDaily = prefs.getInt(dailyKey) ?? 0;
 
-      if (!mounted) return;
-
-      setState(() {
-        strokes
-          ..clear()
-          ..addAll(loadedStrokes);
-      });
-    } catch (_) {
-      // تجاهل بيانات الرسم غير الصالحة.
+    if (savedDate != today) {
+      savedDaily = 0;
+      await prefs.setInt(dailyKey, 0);
+      await prefs.setString(dateKey, today);
     }
+
+    if (!mounted) return;
+
+    setState(() {
+      sessionCount = prefs.getInt(sessionKey) ?? 0;
+      dailyCount = savedDaily;
+      totalCount = prefs.getInt(totalKey) ?? 0;
+      loading = false;
+    });
   }
 
-  Future<void> saveDrawing() async {
+  Future<void> saveCounters() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final data = strokes.map((stroke) {
-      return stroke.map((point) {
-        return [point.dx, point.dy];
-      }).toList();
-    }).toList();
-
-    await prefs.setString(drawingKey, jsonEncode(data));
+    await prefs.setInt(sessionKey, sessionCount);
+    await prefs.setInt(dailyKey, dailyCount);
+    await prefs.setInt(totalKey, totalCount);
+    await prefs.setString(dateKey, todayKey());
   }
 
-  void startDrawing(DragStartDetails details, Size size) {
-    setState(() {
-      currentStroke = [
-        Offset(
-          (details.localPosition.dx / size.width).clamp(0.0, 1.0),
-          (details.localPosition.dy / size.height).clamp(0.0, 1.0),
-        ),
-      ];
-      strokes.add(currentStroke);
-    });
-  }
+  Future<void> incrementCounter() async {
+    if (loading) return;
 
-  void continueDrawing(DragUpdateDetails details, Size size) {
-    setState(() {
-      currentStroke.add(
-        Offset(
-          (details.localPosition.dx / size.width).clamp(0.0, 1.0),
-          (details.localPosition.dy / size.height).clamp(0.0, 1.0),
-        ),
-      );
-    });
-    saveDrawing();
-  }
-
-  void finishDrawing() {
-    saveDrawing();
-    currentStroke = [];
-  }
-
-  Future<void> clearDrawing() async {
-    setState(() {
-      strokes.clear();
-      currentStroke.clear();
-    });
-
+    final today = todayKey();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(drawingKey);
+    final savedDate = prefs.getString(dateKey);
+
+    setState(() {
+      if (savedDate != today) {
+        dailyCount = 0;
+      }
+
+      sessionCount++;
+      dailyCount++;
+      totalCount++;
+    });
+
+    HapticFeedback.lightImpact();
+    await saveCounters();
+  }
+
+  Future<void> resetSession() async {
+    if (loading || sessionCount == 0) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF17130E),
+        title: const Text(
+          'تصفير عداد الجلسة',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'هل تريد تصفير عداد الجلسة فقط؟',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              'تصفير',
+              style: TextStyle(color: accent),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    setState(() {
+      sessionCount = 0;
+    });
+
+    await saveCounters();
+  }
+
+  String formatCount(int value) {
+    return value.toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (match) => '${match[1]},',
+    );
   }
 
   void openChat() {
@@ -205,11 +207,353 @@ class _StoryPageState extends State<StoryPage> {
               baseline: TextBaseline.alphabetic,
               child: GestureDetector(
                 onTap: openChat,
-                child: Text('طبيب', style: textStyle),
+                child: Text(
+                  'طبيب',
+                  style: textStyle,
+                ),
               ),
             ),
-            TextSpan(
-              text: parts.skip(1).join('طبيب'),
+            TextSpan(text: parts.skip(1).join('طبيب')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget pearl({double size = 11}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const RadialGradient(
+          center: Alignment(-0.35, -0.4),
+          colors: [
+            Colors.white,
+            Color(0xFFF7EAD4),
+            Color(0xFFB99B70),
+          ],
+        ),
+        border: Border.all(
+          color: const Color(0xFFE9D5A9),
+          width: 0.7,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.35),
+            blurRadius: 5,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget floralDecoration() {
+    return Icon(
+      Icons.local_florist_rounded,
+      color: accent.withValues(alpha: 0.8),
+      size: 25,
+    );
+  }
+
+  Widget buildDeviceButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onPressed,
+    bool primary = false,
+  }) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: onPressed,
+            child: Ink(
+              padding: const EdgeInsets.symmetric(
+                vertical: 13,
+                horizontal: 8,
+              ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: primary
+                      ? [
+                          accent,
+                          Color.lerp(accent, Colors.black, 0.35)!,
+                        ]
+                      : [
+                          const Color(0xFF3A3024),
+                          const Color(0xFF17120D),
+                        ],
+                ),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: accent,
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.2),
+                    blurRadius: 9,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    icon,
+                    color: primary ? Colors.black : accent,
+                    size: 23,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: primary ? Colors.black : Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget buildTasbihDevice() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF59452B),
+            Color(0xFF17110B),
+            Color(0xFF4A3824),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(
+          color: accent,
+          width: 2.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.25),
+            blurRadius: 22,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 17,
+          vertical: 20,
+        ),
+        decoration: BoxDecoration(
+          color: const Color(0xFF17120D),
+          borderRadius: BorderRadius.circular(25),
+          border: Border.all(
+            color: const Color(0xFFE6D2A6),
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                floralDecoration(),
+                pearl(size: 15),
+                pearl(size: 11),
+                pearl(size: 15),
+                floralDecoration(),
+              ],
+            ),
+
+            const SizedBox(height: 15),
+
+            Text(
+              'اللهم صلِّ على محمد وآل محمد',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: accent,
+                fontSize: 19,
+                fontWeight: FontWeight.bold,
+                height: 1.7,
+              ),
+            ),
+
+            const SizedBox(height: 17),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                vertical: 13,
+                horizontal: 12,
+              ),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFFB7B99C),
+                    Color(0xFFE4E5C8),
+                    Color(0xFF9EA487),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: accent,
+                  width: 2,
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black54,
+                    blurRadius: 8,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  const Text(
+                    'SESSION COUNTER',
+                    style: TextStyle(
+                      color: Color(0xFF343A2B),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      formatCount(sessionCount).padLeft(6, '0'),
+                      style: const TextStyle(
+                        color: Color(0xFF202719),
+                        fontSize: 43,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: 'monospace',
+                        letterSpacing: 3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 18),
+
+            Row(
+              children: [
+                buildDeviceButton(
+                  label: 'COUNT',
+                  icon: Icons.touch_app_rounded,
+                  primary: true,
+                  onPressed: incrementCounter,
+                ),
+                buildDeviceButton(
+                  label: 'RESET',
+                  icon: Icons.restart_alt_rounded,
+                  onPressed: resetSession,
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 17),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                floralDecoration(),
+                pearl(size: 13),
+                pearl(size: 9),
+                pearl(size: 13),
+                floralDecoration(),
+              ],
+            ),
+
+            const SizedBox(height: 17),
+
+            Text(
+              'التحدي اليومي',
+              style: TextStyle(
+                color: accent,
+                fontWeight: FontWeight.bold,
+                fontSize: 19,
+              ),
+            ),
+
+            const SizedBox(height: 7),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'هدفك اليوم: 1000',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                Text(
+                  '${formatCount(dailyCount)} / 1,000',
+                  style: TextStyle(
+                    color: accent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 9),
+
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: LinearProgressIndicator(
+                value: (dailyCount / dailyTarget).clamp(0.0, 1.0),
+                minHeight: 10,
+                backgroundColor: Colors.white12,
+                valueColor: AlwaysStoppedAnimation<Color>(accent),
+              ),
+            ),
+
+            const SizedBox(height: 18),
+
+            Text(
+              'هل تعلم كم مرة صلّيت على محمد وآل محمد؟',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                height: 1.7,
+              ),
+            ),
+
+            const SizedBox(height: 5),
+
+            Text(
+              formatCount(totalCount),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: accent,
+                fontSize: 29,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'monospace',
+              ),
+            ),
+
+            const Text(
+              'صلاة على محمد وآل محمد',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 13,
+              ),
             ),
           ],
         ),
@@ -217,179 +561,37 @@ class _StoryPageState extends State<StoryPage> {
     );
   }
 
-  Widget buildScene(_StoryScene scene, int index) {
+  Widget buildStoryCard() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 32),
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: const Color(0xFF101010),
-        border: Border.all(color: gold, width: 1.4),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: accent,
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: gold.withValues(alpha: 0.10),
+            color: accent.withValues(alpha: 0.10),
             blurRadius: 12,
           ),
         ],
       ),
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(15, 15, 15, 10),
-            child: Text(
-              'المشهد ${index + 1} - ${scene.title}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: gold,
-                fontSize: 19,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          Container(
-            height: 190,
-            margin: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF080B12),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: gold.withValues(alpha: 0.55),
-              ),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Positioned(
-                  top: 15,
-                  right: 20,
-                  child: Icon(
-                    Icons.star,
-                    color: gold.withValues(alpha: 0.5),
-                    size: 18,
-                  ),
-                ),
-                Positioned(
-                  top: 35,
-                  left: 35,
-                  child: Icon(
-                    Icons.star,
-                    color: gold.withValues(alpha: 0.35),
-                    size: 13,
-                  ),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      scene.icon,
-                      color: gold,
-                      size: 85,
-                    ),
-                    const SizedBox(width: 22),
-                    Icon(
-                      scene.secondIcon,
-                      color: Colors.white70,
-                      size: 65,
-                    ),
-                  ],
-                ),
-                Positioned(
-                  bottom: 12,
-                  child: Text(
-                    scene.description,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(17, 18, 17, 20),
-            child: buildStoryText(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget buildDrawingBoard() {
-    return Container(
-      margin: const EdgeInsets.only(top: 12, bottom: 25),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101010),
-        border: Border.all(color: gold, width: 1.6),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'مساحة الرسم',
+          Text(
+            'لكل منا قصة',
+            textAlign: TextAlign.center,
             style: TextStyle(
-              color: gold,
-              fontSize: 23,
+              color: accent,
+              fontSize: 27,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 7),
-          const Text(
-            'ارسم بإصبعك واحتفظ برسوماتك',
-            style: TextStyle(color: Colors.white70),
-          ),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final boardSize = Size(
-                constraints.maxWidth,
-                300,
-              );
-
-              return GestureDetector(
-                onPanStart: (details) {
-                  startDrawing(details, boardSize);
-                },
-                onPanUpdate: (details) {
-                  continueDrawing(details, boardSize);
-                },
-                onPanEnd: (_) {
-                  finishDrawing();
-                },
-                child: Container(
-                  height: 300,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    border: Border.all(
-                      color: gold.withValues(alpha: 0.6),
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: CustomPaint(
-                    painter: _DrawingPainter(strokes: strokes),
-                    child: const SizedBox.expand(),
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 13),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: strokes.isEmpty ? null : clearDrawing,
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('مسح الرسم'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: gold,
-                    side: const BorderSide(color: gold),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          const SizedBox(height: 18),
+          buildStoryText(),
         ],
       ),
     );
@@ -401,7 +603,7 @@ class _StoryPageState extends State<StoryPage> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
-        foregroundColor: gold,
+        foregroundColor: accent,
         elevation: 0,
         centerTitle: true,
         title: const Text(
@@ -423,101 +625,27 @@ class _StoryPageState extends State<StoryPage> {
         child: Directionality(
           textDirection: TextDirection.rtl,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(17, 15, 17, 30),
+            padding: const EdgeInsets.fromLTRB(15, 15, 15, 30),
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 17,
-                  horizontal: 10,
-                ),
-                decoration: BoxDecoration(
-                  border: Border.all(color: gold, width: 1.5),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Text(
-                  'لكل منا قصة',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: gold,
-                    fontSize: 29,
-                    fontWeight: FontWeight.bold,
+              if (loading)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(40),
+                    child: CircularProgressIndicator(
+                      color: accent,
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 25),
-              for (int i = 0; i < scenes.length; i++)
-                buildScene(scenes[i], i),
-              buildDrawingBoard(),
+                )
+              else
+                buildTasbihDevice(),
+
+              const SizedBox(height: 28),
+
+              buildStoryCard(),
             ],
           ),
         ),
       ),
     );
-  }
-}
-
-class _StoryScene {
-  final String title;
-  final IconData icon;
-  final IconData secondIcon;
-  final String description;
-
-  const _StoryScene({
-    required this.title,
-    required this.icon,
-    required this.secondIcon,
-    required this.description,
-  });
-}
-
-class _DrawingPainter extends CustomPainter {
-  final List<List<Offset>> strokes;
-
-  _DrawingPainter({required this.strokes});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFD4AF37)
-      ..strokeWidth = 4
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke;
-
-    for (final stroke in strokes) {
-      if (stroke.isEmpty) continue;
-
-      if (stroke.length == 1) {
-        canvas.drawCircle(
-          Offset(
-            stroke.first.dx * size.width,
-            stroke.first.dy * size.height,
-          ),
-          2,
-          paint,
-        );
-        continue;
-      }
-
-      final path = Path()
-        ..moveTo(
-          stroke.first.dx * size.width,
-          stroke.first.dy * size.height,
-        );
-
-      for (final point in stroke.skip(1)) {
-        path.lineTo(
-          point.dx * size.width,
-          point.dy * size.height,
-        );
-      }
-
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DrawingPainter oldDelegate) {
-    return true;
   }
 }
