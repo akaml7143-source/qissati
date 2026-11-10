@@ -29,6 +29,13 @@ jobs:
       - name: Create Android platform
         run: flutter create --platforms=android --org com.qissati --project-name moon .
 
+      - name: Configure Firebase
+        run: |
+          mkdir -p android/app
+          cp google-services.json android/app/google-services.json
+          sed -i '/id("org.jetbrains.kotlin.android")/a\    id("com.google.gms.google-services") version "4.4.2" apply false' android/settings.gradle.kts
+          sed -i '/id("dev.flutter.flutter-gradle-plugin")/i\    id("com.google.gms.google-services")' android/app/build.gradle.kts
+
       - name: Set application name
         run: |
           sed -i 's/android:label="[^"]*"/android:label="moon"/' android/app/src/main/AndroidManifest.xml
