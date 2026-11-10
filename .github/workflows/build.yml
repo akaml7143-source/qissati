@@ -1,31 +1,42 @@
-name: Build APK
-on: workflow_dispatch
+
+name: Build MY STORY APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Check google-services.json
-        run: test -f google-services.json || (echo "Upload google-services.json to the repo root first" && exit 1)
-      - run: unzip -q qissati-phase2.zip
-      - uses: actions/setup-java@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - uses: subosito/flutter-action@v2
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           channel: stable
-      - working-directory: qissati
-        run: |
-          flutter create --org com.qissati --project-name qissati --platforms android .
-          cp ../google-services.json android/app/google-services.json
-          sed -i '/id("org.jetbrains.kotlin.android")/a\    id("com.google.gms.google-services") version "4.4.2" apply false' android/settings.gradle.kts
-          sed -i '/id("dev.flutter.flutter-gradle-plugin")/i\    id("com.google.gms.google-services")' android/app/build.gradle.kts
-          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/' android/app/build.gradle.kts
-          sed -i 's/android:label="qissati"/android:label="Qissati"/' android/app/src/main/AndroidManifest.xml
-          flutter pub get
-          flutter build apk --release
-      - uses: actions/upload-artifact@v4
+
+      - name: Create Android platform
+        run: flutter create --platforms=android --org com.qissati .
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
-          name: qissati-apk
-          path: qissati/build/app/outputs/flutter-apk/app-release.apk
+          name: MY-STORY-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
