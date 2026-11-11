@@ -17,15 +17,10 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
-  static const Color gold = Color(0xFFD4AF37);
-  static const Color black = Colors.black;
-  static const Color bubble = Color(0xFF171717);
-
   final TextEditingController messageController =
       TextEditingController();
 
-  final ScrollController scrollController =
-      ScrollController();
+  final ScrollController scrollController = ScrollController();
 
   final List<Map<String, dynamic>> messages = [
     {
@@ -47,19 +42,49 @@ class _ChatPageState extends State<ChatPage> {
   final Set<int> selectedMessages = {};
 
   String? replyText;
+
   bool get selectionMode => selectedMessages.isNotEmpty;
 
   bool get isArabic =>
       Localizations.localeOf(context).languageCode == 'ar';
+
+  bool get isDark =>
+      Theme.of(context).brightness == Brightness.dark;
+
+  Color get accent => widget.accentColor;
+
+  Color get background =>
+      isDark ? Colors.black : const Color(0xFFFFFDF7);
+
+  Color get surface =>
+      isDark ? const Color(0xFF171717) : const Color(0xFFF0ECE5);
+
+  Color get secondarySurface =>
+      isDark ? const Color(0xFF242424) : const Color(0xFFE7E0D5);
+
+  Color get primaryText =>
+      isDark ? Colors.white : Colors.black87;
+
+  Color get secondaryText =>
+      isDark ? Colors.white60 : Colors.black54;
+
+  Color get myBubble =>
+      Color.lerp(background, accent, isDark ? 0.25 : 0.17)!;
+
+  Color get selectedBubble =>
+      Color.lerp(background, accent, 0.42)!;
 
   String tr(String ar, String en) => isArabic ? ar : en;
 
   void showMessage(String text) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(text, textAlign: TextAlign.center),
+        content: Text(
+          text,
+          textAlign: TextAlign.center,
+        ),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFF292929),
+        backgroundColor: secondarySurface,
       ),
     );
   }
@@ -87,6 +112,7 @@ class _ChatPageState extends State<ChatPage> {
 
   void sendMessage() {
     final text = messageController.text.trim();
+
     if (text.isEmpty) return;
 
     setState(() {
@@ -106,6 +132,8 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> editMessage(int index) async {
+    if (index < 0 || index >= messages.length) return;
+
     final controller = TextEditingController(
       text: messages[index]['text'] as String,
     );
@@ -114,24 +142,27 @@ class _ChatPageState extends State<ChatPage> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          backgroundColor: bubble,
+          backgroundColor: surface,
           title: Text(
             tr('تعديل الرسالة', 'Edit message'),
-            style: const TextStyle(color: gold),
+            style: TextStyle(color: accent),
           ),
           content: TextField(
             controller: controller,
             autofocus: true,
             maxLines: 5,
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: primaryText),
             decoration: InputDecoration(
               hintText: tr('اكتب التعديل...', 'Edit text...'),
-              hintStyle: const TextStyle(color: Colors.white38),
-              enabledBorder: const UnderlineInputBorder(
-                borderSide: BorderSide(color: gold),
+              hintStyle: TextStyle(color: secondaryText),
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: accent),
               ),
-              focusedBorder: const UnderlineInputBorder(
-                borderSide: BorderSide(color: gold, width: 2),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(
+                  color: accent,
+                  width: 2,
+                ),
               ),
             ),
           ),
@@ -140,7 +171,7 @@ class _ChatPageState extends State<ChatPage> {
               onPressed: () => Navigator.pop(dialogContext),
               child: Text(
                 tr('إلغاء', 'Cancel'),
-                style: const TextStyle(color: Colors.white70),
+                style: TextStyle(color: secondaryText),
               ),
             ),
             TextButton(
@@ -152,7 +183,7 @@ class _ChatPageState extends State<ChatPage> {
               },
               child: Text(
                 tr('حفظ', 'Save'),
-                style: const TextStyle(color: gold),
+                style: TextStyle(color: accent),
               ),
             ),
           ],
@@ -162,9 +193,8 @@ class _ChatPageState extends State<ChatPage> {
 
     controller.dispose();
 
-    if (edited == null || edited.isEmpty) return;
-
-    if (!mounted) return;
+    if (edited == null || edited.isEmpty || !mounted) return;
+    if (index >= messages.length) return;
 
     setState(() {
       messages[index]['text'] = edited;
@@ -172,28 +202,28 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  Future<void> deleteMessage(int index) async {
-    final confirmed = await showDialog<bool>(
+  Future<bool> confirmDelete({
+    required String title,
+    required String content,
+  }) async {
+    final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: bubble,
+        backgroundColor: surface,
         title: Text(
-          tr('حذف الرسالة', 'Delete message'),
-          style: const TextStyle(color: gold),
+          title,
+          style: TextStyle(color: accent),
         ),
         content: Text(
-          tr(
-            'هل تريد حذف هذه الرسالة من هذه المحادثة؟',
-            'Delete this message from this chat?',
-          ),
-          style: const TextStyle(color: Colors.white),
+          content,
+          style: TextStyle(color: primaryText),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
             child: Text(
               tr('إلغاء', 'Cancel'),
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: secondaryText),
             ),
           ),
           TextButton(
@@ -207,7 +237,22 @@ class _ChatPageState extends State<ChatPage> {
       ),
     );
 
-    if (confirmed != true || !mounted) return;
+    return result == true;
+  }
+
+  Future<void> deleteMessage(int index) async {
+    if (index < 0 || index >= messages.length) return;
+
+    final confirmed = await confirmDelete(
+      title: tr('حذف الرسالة', 'Delete message'),
+      content: tr(
+        'هل تريد حذف هذه الرسالة من هذه المحادثة؟',
+        'Delete this message from this chat?',
+      ),
+    );
+
+    if (!confirmed || !mounted) return;
+    if (index >= messages.length) return;
 
     setState(() {
       messages.removeAt(index);
@@ -218,41 +263,15 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> deleteSelected() async {
     if (selectedMessages.isEmpty) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: bubble,
-        title: Text(
-          tr('حذف الرسائل', 'Delete messages'),
-          style: const TextStyle(color: gold),
-        ),
-        content: Text(
-          tr(
-            'هل تريد حذف الرسائل المحددة من هذه المحادثة؟',
-            'Delete the selected messages from this chat?',
-          ),
-          style: const TextStyle(color: Colors.white),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: Text(
-              tr('إلغاء', 'Cancel'),
-              style: const TextStyle(color: Colors.white70),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text(
-              tr('حذف', 'Delete'),
-              style: const TextStyle(color: Colors.redAccent),
-            ),
-          ),
-        ],
+    final confirmed = await confirmDelete(
+      title: tr('حذف الرسائل', 'Delete messages'),
+      content: tr(
+        'هل تريد حذف الرسائل المحددة من هذه المحادثة؟',
+        'Delete the selected messages from this chat?',
       ),
     );
 
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     setState(() {
       final indexes = selectedMessages.toList()
@@ -269,14 +288,20 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void copyMessage(int index) {
+    if (index < 0 || index >= messages.length) return;
+
     Clipboard.setData(
-      ClipboardData(text: messages[index]['text'] as String),
+      ClipboardData(
+        text: messages[index]['text'] as String,
+      ),
     );
 
     showMessage(tr('تم نسخ الرسالة', 'Message copied'));
   }
 
   void replyToMessage(int index) {
+    if (index < 0 || index >= messages.length) return;
+
     setState(() {
       replyText = messages[index]['text'] as String;
       selectedMessages.clear();
@@ -284,6 +309,8 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void forwardMessage(int index) {
+    if (index < 0 || index >= messages.length) return;
+
     final text = messages[index]['text'] as String;
 
     setState(() {
@@ -298,6 +325,7 @@ class _ChatPageState extends State<ChatPage> {
     });
 
     scrollToBottom();
+
     showMessage(
       tr(
         'أضيفت نسخة محلية من الرسالة إلى المحادثة.',
@@ -307,6 +335,8 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void toggleSelection(int index) {
+    if (index < 0 || index >= messages.length) return;
+
     setState(() {
       if (selectedMessages.contains(index)) {
         selectedMessages.remove(index);
@@ -320,25 +350,29 @@ class _ChatPageState extends State<ChatPage> {
     String title,
     IconData icon,
     VoidCallback onTap, {
-    Color color = Colors.white,
+    Color? color,
   }) {
+    final itemColor = color ?? primaryText;
+
     return ListTile(
-      leading: Icon(icon, color: color),
+      leading: Icon(icon, color: itemColor),
       title: Text(
         title,
-        style: TextStyle(color: color),
+        style: TextStyle(color: itemColor),
       ),
       onTap: onTap,
     );
   }
 
   void showMessageOptions(int index) {
+    if (index < 0 || index >= messages.length) return;
+
     final message = messages[index];
     final mine = message['mine'] as bool;
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: bubble,
+      backgroundColor: surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
           top: Radius.circular(22),
@@ -350,14 +384,16 @@ class _ChatPageState extends State<ChatPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: 10),
+
               Container(
                 width: 42,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white30,
+                  color: secondaryText,
                   borderRadius: BorderRadius.circular(5),
                 ),
               ),
+
               const SizedBox(height: 10),
 
               actionTile(
@@ -404,7 +440,7 @@ class _ChatPageState extends State<ChatPage> {
                     Navigator.pop(sheetContext);
                     editMessage(index);
                   },
-                  color: gold,
+                  color: accent,
                 ),
 
               if (mine)
@@ -445,6 +481,12 @@ class _ChatPageState extends State<ChatPage> {
     final text = message['text'] as String;
     final reply = message['reply'] as String?;
 
+    final bubbleColor = selected
+        ? selectedBubble
+        : mine
+            ? myBubble
+            : surface;
+
     return GestureDetector(
       onLongPress: () {
         if (!selectionMode) {
@@ -455,8 +497,9 @@ class _ChatPageState extends State<ChatPage> {
       },
       onTap: selectionMode ? () => toggleSelection(index) : null,
       child: Align(
-        alignment:
-            mine ? Alignment.centerRight : Alignment.centerLeft,
+        alignment: mine
+            ? Alignment.centerRight
+            : Alignment.centerLeft,
         child: Container(
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.82,
@@ -464,17 +507,13 @@ class _ChatPageState extends State<ChatPage> {
           margin: const EdgeInsets.symmetric(vertical: 6),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: selected
-                ? const Color(0xFF493C17)
-                : mine
-                    ? const Color(0xFF3A3018)
-                    : bubble,
+            color: bubbleColor,
             border: Border.all(
               color: selected
-                  ? Colors.white
+                  ? accent
                   : mine
-                      ? gold
-                      : Colors.white24,
+                      ? accent
+                      : secondaryText.withValues(alpha: 0.3),
               width: selected ? 2 : 0.8,
             ),
             borderRadius: BorderRadius.only(
@@ -493,9 +532,12 @@ class _ChatPageState extends State<ChatPage> {
                   padding: const EdgeInsets.all(8),
                   margin: const EdgeInsets.only(bottom: 8),
                   decoration: BoxDecoration(
-                    color: Colors.black26,
-                    border: const Border(
-                      right: BorderSide(color: gold, width: 3),
+                    color: secondarySurface,
+                    border: Border(
+                      right: BorderSide(
+                        color: accent,
+                        width: 3,
+                      ),
                     ),
                     borderRadius: BorderRadius.circular(6),
                   ),
@@ -503,8 +545,8 @@ class _ChatPageState extends State<ChatPage> {
                     reply,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white70,
+                    style: TextStyle(
+                      color: secondaryText,
                       fontSize: 12,
                     ),
                   ),
@@ -515,7 +557,7 @@ class _ChatPageState extends State<ChatPage> {
                 child: Text(
                   text,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: primaryText,
                     fontSize: widget.fontSize,
                     height: 1.5,
                   ),
@@ -532,24 +574,26 @@ class _ChatPageState extends State<ChatPage> {
                       padding: const EdgeInsets.only(left: 5),
                       child: Text(
                         tr('معدّلة', 'edited'),
-                        style: const TextStyle(
-                          color: gold,
+                        style: TextStyle(
+                          color: accent,
                           fontSize: 10,
                         ),
                       ),
                     ),
+
                   Text(
                     message['time'] as String,
-                    style: const TextStyle(
-                      color: Colors.white54,
+                    style: TextStyle(
+                      color: secondaryText,
                       fontSize: 10,
                     ),
                   ),
+
                   if (mine) ...[
                     const SizedBox(width: 4),
-                    const Icon(
+                    Icon(
                       Icons.done_all,
-                      color: gold,
+                      color: accent,
                       size: 15,
                     ),
                   ],
@@ -569,9 +613,12 @@ class _ChatPageState extends State<ChatPage> {
       margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       padding: const EdgeInsets.all(9),
       decoration: BoxDecoration(
-        color: const Color(0xFF242018),
-        border: const Border(
-          right: BorderSide(color: gold, width: 3),
+        color: surface,
+        border: Border(
+          right: BorderSide(
+            color: accent,
+            width: 3,
+          ),
         ),
         borderRadius: BorderRadius.circular(8),
       ),
@@ -582,14 +629,19 @@ class _ChatPageState extends State<ChatPage> {
               '${tr('الرد على:', 'Replying to:')} $replyText',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white70),
+              style: TextStyle(color: secondaryText),
             ),
           ),
+
           IconButton(
-            onPressed: () => setState(() => replyText = null),
-            icon: const Icon(
+            onPressed: () {
+              setState(() {
+                replyText = null;
+              });
+            },
+            icon: Icon(
               Icons.close,
-              color: gold,
+              color: accent,
             ),
           ),
         ],
@@ -599,7 +651,7 @@ class _ChatPageState extends State<ChatPage> {
 
   Widget buildComposer() {
     return Container(
-      color: const Color(0xFF101010),
+      color: background,
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
       child: SafeArea(
         top: false,
@@ -607,68 +659,71 @@ class _ChatPageState extends State<ChatPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             buildReplyPreview(),
+
             Row(
               children: [
                 IconButton(
                   onPressed: () => showNotReady(
                     tr('المرفقات', 'Attachments'),
                   ),
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.attach_file,
-                    color: gold,
+                    color: accent,
                   ),
                 ),
+
                 Expanded(
                   child: TextField(
                     controller: messageController,
                     minLines: 1,
                     maxLines: 5,
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(
+                      color: primaryText,
+                      fontSize: widget.fontSize,
+                    ),
                     decoration: InputDecoration(
                       hintText: tr(
                         'اكتب رسالتك...',
                         'Write a message...',
                       ),
-                      hintStyle: const TextStyle(
-                        color: Colors.white38,
-                      ),
+                      hintStyle: TextStyle(color: secondaryText),
                       filled: true,
-                      fillColor: const Color(0xFF222222),
+                      fillColor: surface,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 17,
                         vertical: 12,
                       ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25),
-                        borderSide: const BorderSide(
-                          color: gold,
-                          width: 0.5,
-                        ),
+                        borderSide: BorderSide(color: accent),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25),
-                        borderSide: const BorderSide(
-                          color: Colors.white24,
+                        borderSide: BorderSide(
+                          color: secondaryText.withValues(alpha: 0.3),
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(25),
-                        borderSide: const BorderSide(
-                          color: gold,
+                        borderSide: BorderSide(
+                          color: accent,
+                          width: 1.5,
                         ),
                       ),
                     ),
                   ),
                 ),
+
                 const SizedBox(width: 6),
+
                 Material(
-                  color: gold,
+                  color: accent,
                   shape: const CircleBorder(),
                   child: IconButton(
                     onPressed: sendMessage,
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.send_rounded,
-                      color: Colors.black,
+                      color: isDark ? Colors.black : Colors.white,
                     ),
                   ),
                 ),
@@ -690,46 +745,52 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection:
-          isArabic ? TextDirection.rtl : TextDirection.ltr,
+      textDirection: isArabic
+          ? TextDirection.rtl
+          : TextDirection.ltr,
       child: Scaffold(
-        backgroundColor: black,
+        backgroundColor: background,
         appBar: AppBar(
-          backgroundColor: black,
-          foregroundColor: gold,
+          backgroundColor: background,
+          foregroundColor: accent,
           elevation: 0,
+
           leading: selectionMode
               ? IconButton(
                   onPressed: () {
-                    setState(() => selectedMessages.clear());
+                    setState(() {
+                      selectedMessages.clear();
+                    });
                   },
                   icon: const Icon(Icons.close),
                 )
               : null,
+
           title: selectionMode
               ? Text(
                   '${selectedMessages.length}',
-                  style: const TextStyle(color: gold),
+                  style: TextStyle(color: accent),
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      tr('moon', 'moon'),
-                      style: const TextStyle(
+                    const Text(
+                      'moon',
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 19,
                       ),
                     ),
                     Text(
                       tr('مراسلة خاصة', 'Private chat'),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white54,
+                        color: secondaryText,
                       ),
                     ),
                   ],
                 ),
+
           actions: selectionMode
               ? [
                   IconButton(
@@ -738,7 +799,10 @@ class _ChatPageState extends State<ChatPage> {
                       Icons.delete_outline,
                       color: Colors.redAccent,
                     ),
-                    tooltip: tr('حذف المحدد', 'Delete selected'),
+                    tooltip: tr(
+                      'حذف المحدد',
+                      'Delete selected',
+                    ),
                   ),
                 ]
               : [
@@ -756,6 +820,7 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ],
         ),
+
         body: Column(
           children: [
             Expanded(
@@ -768,6 +833,7 @@ class _ChatPageState extends State<ChatPage> {
                 },
               ),
             ),
+
             if (!selectionMode) buildComposer(),
           ],
         ),
