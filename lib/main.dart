@@ -3,12 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import 'screens/story_page.dart';
 import 'screens/settings_page.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // تهيئة Firebase
+  await Firebase.initializeApp();
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -63,9 +67,8 @@ class MyStoryAppState extends State<MyStoryApp> {
       if (!mounted) return;
 
       setState(() {
-        themeMode = savedTheme == 'light'
-            ? ThemeMode.light
-            : ThemeMode.dark;
+        themeMode =
+            savedTheme == 'light' ? ThemeMode.light : ThemeMode.dark;
 
         if (savedColor != null) {
           accentColor = Color(savedColor);
@@ -75,11 +78,9 @@ class MyStoryAppState extends State<MyStoryApp> {
           fontSize = savedFontSize.clamp(14.0, 32.0);
         }
 
-        if (savedLanguage == 'en') {
-          locale = const Locale('en');
-        } else {
-          locale = const Locale('ar');
-        }
+        locale = savedLanguage == 'en'
+            ? const Locale('en')
+            : const Locale('ar');
 
         _isLoading = false;
       });
@@ -106,15 +107,8 @@ class MyStoryAppState extends State<MyStoryApp> {
         accentColor.toARGB32(),
       );
 
-      await prefs.setDouble(
-        'moon_font_size',
-        fontSize,
-      );
-
-      await prefs.setString(
-        'moon_language',
-        locale.languageCode,
-      );
+      await prefs.setDouble('moon_font_size', fontSize);
+      await prefs.setString('moon_language', locale.languageCode);
     } catch (_) {
       // يبقى التطبيق يعمل حتى لو تعذر حفظ الإعدادات.
     }
@@ -124,7 +118,6 @@ class MyStoryAppState extends State<MyStoryApp> {
     setState(() {
       themeMode = value;
     });
-
     _saveSettings();
   }
 
@@ -132,7 +125,6 @@ class MyStoryAppState extends State<MyStoryApp> {
     setState(() {
       accentColor = value;
     });
-
     _saveSettings();
   }
 
@@ -140,7 +132,6 @@ class MyStoryAppState extends State<MyStoryApp> {
     setState(() {
       fontSize = value.clamp(14.0, 32.0);
     });
-
     _saveSettings();
   }
 
@@ -148,7 +139,6 @@ class MyStoryAppState extends State<MyStoryApp> {
     setState(() {
       locale = Locale(value);
     });
-
     _saveSettings();
   }
 
