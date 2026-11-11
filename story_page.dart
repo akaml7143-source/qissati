@@ -6,18 +6,18 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'chat_page.dart';
-
 class StoryPage extends StatefulWidget {
   final Color accentColor;
   final double fontSize;
   final VoidCallback onSettings;
+  final VoidCallback onOpenChat;
 
   const StoryPage({
     super.key,
     required this.accentColor,
     required this.fontSize,
     required this.onSettings,
+    required this.onOpenChat,
   });
 
   @override
@@ -274,15 +274,7 @@ class _StoryPageState extends State<StoryPage> {
   }
 
   void openChat() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ChatPage(
-          accentColor: widget.accentColor,
-          fontSize: widget.fontSize,
-        ),
-      ),
-    );
+    widget.onOpenChat();
   }
 
   String formatCount(int value) {
@@ -669,6 +661,12 @@ class _StoryPageState extends State<StoryPage> {
           TextSpan(
             text: 'طبيب',
             recognizer: doctorTap,
+            style: const TextStyle(
+              color: gold,
+              fontWeight: FontWeight.bold,
+              decoration: TextDecoration.underline,
+              decorationColor: gold,
+            ),
           ),
         );
       }
@@ -802,4 +800,3 @@ class _DrawingPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DrawingPainter oldDelegate) => true;
 }
-
