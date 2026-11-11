@@ -2,7 +2,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -82,8 +81,6 @@ class _StoryPageState extends State<StoryPage> {
 لكلّ شخصٍ منّا قصة، فلا تحكم على الآخرين قبل أن تعرفهم جيّدًا...قد تدهشك الحقيقة عنهم.
 ''';
 
-  final TapGestureRecognizer doctorTap = TapGestureRecognizer();
-
   int sessionCount = 0;
   int dailyCount = 0;
   int totalCount = 0;
@@ -110,14 +107,7 @@ class _StoryPageState extends State<StoryPage> {
   @override
   void initState() {
     super.initState();
-    doctorTap.onTap = openChat;
     loadData();
-  }
-
-  @override
-  void dispose() {
-    doctorTap.dispose();
-    super.dispose();
   }
 
   String get today {
@@ -218,7 +208,7 @@ class _StoryPageState extends State<StoryPage> {
       ),
     );
 
-    if (confirmed == true) {
+    if (confirmed == true && mounted) {
       setState(() => sessionCount = 0);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('moon_tasbih_session', 0);
@@ -264,7 +254,7 @@ class _StoryPageState extends State<StoryPage> {
       ),
     );
 
-    if (confirmed == true) {
+    if (confirmed == true && mounted) {
       setState(() {
         strokes.clear();
         currentStroke = null;
@@ -546,9 +536,7 @@ class _StoryPageState extends State<StoryPage> {
                   behavior: HitTestBehavior.opaque,
                   onPanStart: (details) {
                     final box = context.findRenderObject() as RenderBox;
-                    final point = box.globalToLocal(
-                      details.globalPosition,
-                    );
+                    final point = box.globalToLocal(details.globalPosition);
 
                     setState(() {
                       currentStroke = _DrawStroke(
@@ -561,9 +549,7 @@ class _StoryPageState extends State<StoryPage> {
                   },
                   onPanUpdate: (details) {
                     final box = context.findRenderObject() as RenderBox;
-                    final point = box.globalToLocal(
-                      details.globalPosition,
-                    );
+                    final point = box.globalToLocal(details.globalPosition);
 
                     setState(() {
                       currentStroke?.points.add(point);
@@ -604,9 +590,7 @@ class _StoryPageState extends State<StoryPage> {
                       color: color,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: drawingColor == color
-                            ? gold
-                            : Colors.white38,
+                        color: drawingColor == color ? gold : Colors.white38,
                         width: drawingColor == color ? 3 : 1,
                       ),
                     ),
@@ -649,8 +633,13 @@ class _StoryPageState extends State<StoryPage> {
   }
 
   Widget buildStory() {
-    final parts = story.split('طبيب');
+    final storyTextStyle = TextStyle(
+      color: Colors.white,
+      fontSize: widget.fontSize,
+      height: 1.9,
+    );
 
+    final parts = story.split('طبيب');
     final spans = <InlineSpan>[];
 
     for (int i = 0; i < parts.length; i++) {
@@ -658,9 +647,17 @@ class _StoryPageState extends State<StoryPage> {
 
       if (i < parts.length - 1) {
         spans.add(
-          TextSpan(
-            text: 'طبيب',
-            recognizer: doctorTap,
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: openChat,
+              child: Text(
+                'طبيب',
+                style: storyTextStyle,
+              ),
+            ),
           ),
         );
       }
@@ -691,11 +688,7 @@ class _StoryPageState extends State<StoryPage> {
             textAlign: TextAlign.right,
             textDirection: TextDirection.rtl,
             text: TextSpan(
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: widget.fontSize,
-                height: 1.9,
-              ),
+              style: storyTextStyle,
               children: spans,
             ),
           ),
