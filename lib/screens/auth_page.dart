@@ -11,6 +11,7 @@ class AuthPage extends StatefulWidget {
 
 class _AuthPageState extends State<AuthPage> {
   final _formKey = GlobalKey<FormState>();
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -19,6 +20,7 @@ class _AuthPageState extends State<AuthPage> {
   bool _hidePassword = true;
 
   static const Color gold = Color(0xFFD4AF37);
+  static const Color background = Color(0xFF101010);
 
   @override
   void dispose() {
@@ -30,63 +32,81 @@ class _AuthPageState extends State<AuthPage> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    FocusScope.of(context).unfocus();
+
     setState(() => _isLoading = true);
 
     try {
-      final auth = FirebaseAuth.instance;
-
       if (_isRegister) {
-        await auth.createUserWithEmailAndPassword(
+        await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
-          password: _passwordController.text,
+          password: _passwordController.text.trim(),
         );
       } else {
-        await auth.signInWithEmailAndPassword(
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: _emailController.text.trim(),
-          password: _passwordController.text,
+          password: _passwordController.text.trim(),
         );
       }
-    } on FirebaseAuthException catch (e) {
+
+      if (!mounted) return;
+
+      // نعيد المستخدم إلى الصفحة الرئيسية،
+      // وهناك يتم فحص موافقة العضوية قبل فتح المحادثة.
+      Navigator.pop(context, true);
+    } on FirebaseAuthException catch (error) {
+      if (!mounted) return;
+
       String message;
 
-      switch (e.code) {
+      switch (error.code) {
         case 'email-already-in-use':
-          message = 'هذا البريد مسجل مسبقاً.';
+          message = 'هذا البريد الإلكتروني مستخدم مسبقاً.';
           break;
         case 'invalid-email':
           message = 'البريد الإلكتروني غير صحيح.';
           break;
         case 'weak-password':
-          message = 'كلمة المرور ضعيفة، استخدم 6 أحرف على الأقل.';
+          message = 'كلمة المرور ضعيفة. استخدم 6 أحرف على الأقل.';
           break;
         case 'user-not-found':
         case 'wrong-password':
         case 'invalid-credential':
-          message = 'البريد أو كلمة المرور غير صحيحة.';
+          message = 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
           break;
         case 'network-request-failed':
-          message = 'تحقق من اتصال الإنترنت.';
+          message = 'تعذّر الاتصال بالإنترنت.';
           break;
         case 'too-many-requests':
-          message = 'محاولات كثيرة، حاول لاحقاً.';
+          message = 'محاولات كثيرة. حاول مرة أخرى لاحقاً.';
+          break;
+        case 'operation-not-allowed':
+          message = 'طريقة الدخول غير مفعّلة في Firebase.';
           break;
         default:
-          message = 'تعذر إكمال العملية: ${e.message ?? e.code}';
+          message = 'تعذّر إكمال العملية. حاول مرة أخرى.';
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('حدث خطأ غير متوقع، حاول مرة أخرى.'),
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            textAlign: TextAlign.right,
           ),
-        );
-      }
+          backgroundColor: Colors.redAccent.shade700,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'حدث خطأ غير متوقع. حاول مرة أخرى.',
+            textAlign: TextAlign.right,
+          ),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -94,10 +114,77 @@ class _AuthPageState extends State<AuthPage> {
     }
   }
 
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool password = false,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: password && _hidePassword,
+      textDirection: TextDirection.ltr,
+      keyboardType: password
+          ? TextInputType.visiblePassword
+          : TextInputType.emailAddress,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 16,
+      ),
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white70),
+        prefixIcon: Icon(icon, color: gold),
+        suffixIcon: password
+            ? IconButton(
+                onPressed: () {
+                  setState(() => _hidePassword = !_hidePassword);
+                },
+                icon: Icon(
+                  _hidePassword
+                      ? Icons.visibility_off
+                      : Icons.visibility,
+                  color: Colors.white54,
+                ),
+              )
+            : null,
+        filled: true,
+        fillColor: const Color(0xFF202020),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: const BorderSide(color: Colors.white24),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: const BorderSide(
+            color: gold,
+            width: 1.5,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: const BorderSide(color: Colors.redAccent),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(15),
+          borderSide: const BorderSide(color: Colors.redAccent),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: background,
+      appBar: AppBar(
+        backgroundColor: background,
+        foregroundColor: gold,
+        title: const Text('moon'),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -109,98 +196,87 @@ class _AuthPageState extends State<AuthPage> {
                   const Icon(
                     Icons.nightlight_round,
                     color: gold,
-                    size: 85,
+                    size: 75,
                   ),
-                  const SizedBox(height: 15),
-                  const Text(
-                    'moon',
-                    style: TextStyle(
-                      color: gold,
-                      fontSize: 34,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 20),
                   Text(
                     _isRegister ? 'إنشاء حساب جديد' : 'تسجيل الدخول',
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 23,
+                      color: gold,
+                      fontSize: 27,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 35),
-
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: _decoration(
-                      'البريد الإلكتروني',
-                      Icons.email_outlined,
+                  const SizedBox(height: 12),
+                  Text(
+                    _isRegister
+                        ? 'أنشئ حسابك للانضمام إلى moon'
+                        : 'أدخل بيانات حسابك للمتابعة',
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 15,
                     ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 35),
+                  _buildTextField(
+                    controller: _emailController,
+                    label: 'البريد الإلكتروني',
+                    icon: Icons.email_outlined,
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return 'أدخل البريد الإلكتروني';
                       }
-                      if (!value.contains('@')) {
+
+                      if (!RegExp(
+                        r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                      ).hasMatch(value.trim())) {
                         return 'البريد الإلكتروني غير صحيح';
                       }
+
                       return null;
                     },
                   ),
-
                   const SizedBox(height: 18),
-
-                  TextFormField(
+                  _buildTextField(
                     controller: _passwordController,
-                    obscureText: _hidePassword,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: _decoration(
-                      'كلمة المرور',
-                      Icons.lock_outline,
-                    ).copyWith(
-                      suffixIcon: IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _hidePassword = !_hidePassword;
-                          });
-                        },
-                        icon: Icon(
-                          _hidePassword
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                          color: gold,
-                        ),
-                      ),
-                    ),
+                    label: 'كلمة المرور',
+                    icon: Icons.lock_outline,
+                    password: true,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'أدخل كلمة المرور';
                       }
-                      if (_isRegister && value.length < 6) {
+
+                      if (value.length < 6) {
                         return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
                       }
+
                       return null;
                     },
                   ),
-
                   const SizedBox(height: 28),
-
                   SizedBox(
                     width: double.infinity,
-                    height: 52,
+                    height: 54,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _submit,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: gold,
                         foregroundColor: Colors.black,
+                        disabledBackgroundColor: Colors.grey,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(15),
                         ),
                       ),
                       child: _isLoading
-                          ? const CircularProgressIndicator(
-                              color: Colors.black,
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.black,
+                              ),
                             )
                           : Text(
                               _isRegister
@@ -213,15 +289,14 @@ class _AuthPageState extends State<AuthPage> {
                             ),
                     ),
                   ),
-
-                  const SizedBox(height: 18),
-
+                  const SizedBox(height: 20),
                   TextButton(
                     onPressed: _isLoading
                         ? null
                         : () {
                             setState(() {
                               _isRegister = !_isRegister;
+                              _formKey.currentState?.reset();
                             });
                           },
                     child: Text(
@@ -242,33 +317,4 @@ class _AuthPageState extends State<AuthPage> {
       ),
     );
   }
-
-  InputDecoration _decoration(String label, IconData icon) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: const TextStyle(color: Colors.white70),
-      prefixIcon: Icon(icon, color: gold),
-      filled: true,
-      fillColor: const Color(0xFF171717),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(15),
-        borderSide: BorderSide(
-          color: gold.withValues(alpha: 0.35),
-        ),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(15),
-        borderSide: const BorderSide(color: gold),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(15),
-        borderSide: const BorderSide(color: Colors.red),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(15),
-        borderSide: const BorderSide(color: Colors.red),
-      ),
-    );
-  }
 }
-
