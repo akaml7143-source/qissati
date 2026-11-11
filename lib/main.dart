@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'screens/story_page.dart';
 import 'screens/settings_page.dart';
@@ -79,10 +80,7 @@ class MyStoryAppState extends State<MyStoryApp> {
       });
     } catch (_) {
       if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
@@ -127,47 +125,111 @@ class MyStoryAppState extends State<MyStoryApp> {
     _saveSettings();
   }
 
-  Widget _buildHome() {
-    if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFFD4AF37),
+  Widget _loadingPage() {
+    return const Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFFD4AF37),
+        ),
+      ),
+    );
+  }
+
+  Widget _messagePage(
+    String title,
+    String message, {
+    bool showSignOut = false,
+    bool showRetry = false,
+  }) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.nightlight_round,
+                color: Color(0xFFD4AF37),
+                size: 65,
+              ),
+              const SizedBox(height: 22),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFFD4AF37),
+                  fontSize: 23,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 16,
+                  height: 1.8,
+                ),
+              ),
+              const SizedBox(height: 25),
+              if (showRetry)
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {});
+                  },
+                  child: const Text('إعادة المحاولة'),
+                ),
+              if (showSignOut)
+                TextButton(
+                  onPressed: () async {
+                    await FirebaseAuth.instance.signOut();
+                  },
+                  child: const Text(
+                    'تسجيل الخروج',
+                    style: TextStyle(color: Color(0xFFD4AF37)),
+                  ),
+                ),
+            ],
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
+  Widget _buildMembershipGate(User user) {
+    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      future: FirebaseFirestore.instance
+          .collection('members')
+          .doc(user.uid)
+          .get(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            backgroundColor: Colors.black,
-            body: Center(
-              child: CircularProgressIndicator(
-                color: Color(0xFFD4AF37),
-              ),
-            ),
-          );
+          return _loadingPage();
         }
 
         if (snapshot.hasError) {
-          return const Scaffold(
-            backgroundColor: Colors.black,
-            body: Center(
-              child: Text(
-                'تعذر التحقق من الحساب. تحقق من اتصال الإنترنت.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
+          return _messagePage(
+            'تعذّر التحقق',
+            'تحقق من اتصال الإنترنت ثم أعد المحاولة.',
+            showSignOut: true,
+            showRetry: true,
           );
         }
 
-        if (snapshot.data == null) {
-          return const AuthPage();
+        final memberData = snapshot.data?.data();
+        final isActive = memberData?['active'] == true;
+
+        if (!isActive) {
+          return _messagePage(
+            'حسابك بانتظار الموافقة',
+            'تم تسجيل الدخول بنجاح، لكن عضويتك لم تُفعّل بعد. '
+                'يرجى انتظار موافقة مالك التطبيق.',
+            showSignOut: true,
+          );
         }
 
         return StoryPage(
@@ -190,6 +252,36 @@ class MyStoryAppState extends State<MyStoryApp> {
             );
           },
         );
+      },
+    );
+  }
+
+  Widget _buildHome() {
+    if (_isLoading) {
+      return _loadingPage();
+    }
+
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _loadingPage();
+        }
+
+        if (snapshot.hasError) {
+          return _messagePage(
+            'تعذّر التحقق من الحساب',
+            'تحقق من اتصال الإنترنت وحاول مرة أخرى.',
+          );
+        }
+
+        final user = snapshot.data;
+
+        if (user == null) {
+          return const AuthPage();
+        }
+
+        return _buildMembershipGate(user);
       },
     );
   }
