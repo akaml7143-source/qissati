@@ -37,6 +37,12 @@ class MyStoryApp extends StatefulWidget {
 }
 
 class _MyStoryAppState extends State<MyStoryApp> {
+  final GlobalKey<NavigatorState> _navigatorKey =
+      GlobalKey<NavigatorState>();
+
+  final GlobalKey<ScaffoldMessengerState> _messengerKey =
+      GlobalKey<ScaffoldMessengerState>();
+
   ThemeMode themeMode = ThemeMode.dark;
   Color accentColor = const Color(0xFFD4AF37);
   double fontSize = 19;
@@ -132,7 +138,10 @@ class _MyStoryAppState extends State<MyStoryApp> {
   }
 
   void openSettings() {
-    Navigator.of(context).push(
+    final navigator = _navigatorKey.currentState;
+    if (navigator == null) return;
+
+    navigator.push(
       MaterialPageRoute(
         builder: (_) => SettingsPage(
           themeMode: themeMode,
@@ -154,13 +163,16 @@ class _MyStoryAppState extends State<MyStoryApp> {
   Future<void> _handleOpenChat() async {
     if (_openingChat || !mounted) return;
 
+    final navigator = _navigatorKey.currentState;
+    if (navigator == null) return;
+
     _openingChat = true;
 
     try {
       User? user = FirebaseAuth.instance.currentUser;
 
       if (user == null) {
-        final result = await Navigator.of(context).push<bool>(
+        final result = await navigator.push<bool>(
           MaterialPageRoute(
             builder: (_) => const AuthPage(),
           ),
@@ -186,6 +198,7 @@ class _MyStoryAppState extends State<MyStoryApp> {
       if (!mounted) return;
 
       final data = memberDocument.data();
+
       final isActive = memberDocument.exists &&
           data != null &&
           data['active'] == true;
@@ -195,7 +208,9 @@ class _MyStoryAppState extends State<MyStoryApp> {
         return;
       }
 
-      await Navigator.of(context).push(
+      if (!mounted) return;
+
+      await _navigatorKey.currentState?.push(
         MaterialPageRoute(
           builder: (_) => ChatPage(
             accentColor: accentColor,
@@ -222,10 +237,13 @@ class _MyStoryAppState extends State<MyStoryApp> {
   Future<void> _showWaitingApproval() async {
     if (!mounted) return;
 
+    final dialogContext = _navigatorKey.currentContext;
+    if (dialogContext == null) return;
+
     await showDialog<void>(
-      context: context,
+      context: dialogContext,
       barrierDismissible: false,
-      builder: (dialogContext) {
+      builder: (context) {
         return AlertDialog(
           backgroundColor: const Color(0xFF171717),
           title: const Text(
@@ -245,7 +263,7 @@ class _MyStoryAppState extends State<MyStoryApp> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(dialogContext);
+                Navigator.pop(context);
               },
               child: const Text(
                 'حسناً',
@@ -254,7 +272,7 @@ class _MyStoryAppState extends State<MyStoryApp> {
             ),
             TextButton(
               onPressed: () async {
-                Navigator.pop(dialogContext);
+                Navigator.pop(context);
                 await FirebaseAuth.instance.signOut();
               },
               child: const Text(
@@ -271,7 +289,7 @@ class _MyStoryAppState extends State<MyStoryApp> {
   void _showMessage(String message) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    _messengerKey.currentState?.showSnackBar(
       SnackBar(
         content: Text(
           message,
@@ -336,6 +354,8 @@ class _MyStoryAppState extends State<MyStoryApp> {
     );
 
     return MaterialApp(
+      navigatorKey: _navigatorKey,
+      scaffoldMessengerKey: _messengerKey,
       debugShowCheckedModeBanner: false,
       title: 'moon',
       locale: locale,
