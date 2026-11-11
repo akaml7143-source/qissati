@@ -1,4 +1,6 @@
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,6 +28,7 @@ class _StoryPageState extends State<StoryPage> {
   static const String dailyKey = 'moon_tasbih_daily';
   static const String totalKey = 'moon_tasbih_total';
   static const String dateKey = 'moon_tasbih_date';
+  static const String drawingKey = 'moon_story_drawing_v1';
 
   static const int dailyTarget = 1000;
 
@@ -35,7 +38,36 @@ class _StoryPageState extends State<StoryPage> {
 
   bool loading = true;
 
+  final List<_DrawStroke> drawingStrokes = [];
+
+  Color drawingColor = const Color(0xFFD4AF37);
+  double drawingWidth = 4;
+
+  final List<Color> drawingColors = const [
+    Color(0xFFD4AF37),
+    Colors.white,
+    Color(0xFFE57373),
+    Color(0xFF64B5F6),
+    Color(0xFF81C784),
+    Color(0xFFF1AFCB),
+  ];
+
   Color get accent => widget.accentColor;
+
+  bool get isDark =>
+      Theme.of(context).brightness == Brightness.dark;
+
+  Color get pageBackground =>
+      isDark ? Colors.black : const Color(0xFFFFFDF7);
+
+  Color get cardBackground =>
+      isDark ? const Color(0xFF151515) : const Color(0xFFF1EEE6);
+
+  Color get textColor =>
+      isDark ? Colors.white : Colors.black87;
+
+  Color get secondaryText =>
+      isDark ? Colors.white70 : Colors.black54;
 
   static const String story = '''
 خلال إحدى الرحلات في القطار، صاح شاب في العشرين من العمر فجأة:
@@ -60,6 +92,7 @@ class _StoryPageState extends State<StoryPage> {
 
   String todayKey() {
     final now = DateTime.now();
+
     return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
 
@@ -67,6 +100,7 @@ class _StoryPageState extends State<StoryPage> {
   void initState() {
     super.initState();
     loadCounters();
+    loadDrawing();
   }
 
   Future<void> loadCounters() async {
@@ -109,6 +143,8 @@ class _StoryPageState extends State<StoryPage> {
     final prefs = await SharedPreferences.getInstance();
     final savedDate = prefs.getString(dateKey);
 
+    if (!mounted) return;
+
     setState(() {
       if (savedDate != today) {
         dailyCount = 0;
@@ -128,25 +164,28 @@ class _StoryPageState extends State<StoryPage> {
 
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF17130E),
-        title: const Text(
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: cardBackground,
+        title: Text(
           'تصفير عداد الجلسة',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: textColor),
         ),
-        content: const Text(
+        content: Text(
           'هل تريد تصفير عداد الجلسة فقط؟',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: secondaryText),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('إلغاء'),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(
+              'إلغاء',
+              style: TextStyle(color: secondaryText),
+            ),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: Text(
               'تصفير',
               style: TextStyle(color: accent),
@@ -188,7 +227,7 @@ class _StoryPageState extends State<StoryPage> {
     final parts = story.split('طبيب');
 
     final textStyle = TextStyle(
-      color: Colors.white,
+      color: textColor,
       fontSize: widget.fontSize,
       height: 1.9,
       fontWeight: FontWeight.w500,
@@ -283,8 +322,8 @@ class _StoryPageState extends State<StoryPage> {
                           Color.lerp(accent, Colors.black, 0.35)!,
                         ]
                       : [
-                          const Color(0xFF3A3024),
-                          const Color(0xFF17120D),
+                          const Color(0xFFE8D9B9),
+                          const Color(0xFFC7B48D),
                         ],
                 ),
                 borderRadius: BorderRadius.circular(18),
@@ -304,14 +343,14 @@ class _StoryPageState extends State<StoryPage> {
                 children: [
                   Icon(
                     icon,
-                    color: primary ? Colors.black : accent,
+                    color: primary ? Colors.black : const Color(0xFF59452B),
                     size: 23,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     label,
                     style: TextStyle(
-                      color: primary ? Colors.black : Colors.white,
+                      color: primary ? Colors.black : const Color(0xFF59452B),
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                       letterSpacing: 1,
@@ -335,9 +374,9 @@ class _StoryPageState extends State<StoryPage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF59452B),
-            Color(0xFF17110B),
-            Color(0xFF4A3824),
+            Color(0xFFFFFDF8),
+            Color(0xFFE8DCC5),
+            Color(0xFFFFFDF8),
           ],
         ),
         borderRadius: BorderRadius.circular(32),
@@ -359,10 +398,16 @@ class _StoryPageState extends State<StoryPage> {
           vertical: 20,
         ),
         decoration: BoxDecoration(
-          color: const Color(0xFF17120D),
+          gradient: const LinearGradient(
+            colors: [
+              Color(0xFFFFFEFA),
+              Color(0xFFF5EBD9),
+              Color(0xFFFFFEFA),
+            ],
+          ),
           borderRadius: BorderRadius.circular(25),
           border: Border.all(
-            color: const Color(0xFFE6D2A6),
+            color: const Color(0xFFD4AF37),
             width: 1.5,
           ),
         ),
@@ -403,9 +448,9 @@ class _StoryPageState extends State<StoryPage> {
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [
-                    Color(0xFFB7B99C),
-                    Color(0xFFE4E5C8),
-                    Color(0xFF9EA487),
+                    Color(0xFFE9E4D2),
+                    Color(0xFFFFFDF0),
+                    Color(0xFFD5D0BA),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(12),
@@ -415,7 +460,7 @@ class _StoryPageState extends State<StoryPage> {
                 ),
                 boxShadow: const [
                   BoxShadow(
-                    color: Colors.black54,
+                    color: Colors.black26,
                     blurRadius: 8,
                     offset: Offset(0, 4),
                   ),
@@ -426,7 +471,7 @@ class _StoryPageState extends State<StoryPage> {
                   const Text(
                     'SESSION COUNTER',
                     style: TextStyle(
-                      color: Color(0xFF343A2B),
+                      color: Color(0xFF59452B),
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 2,
@@ -499,7 +544,7 @@ class _StoryPageState extends State<StoryPage> {
               children: [
                 const Text(
                   'هدفك اليوم: 1000',
-                  style: TextStyle(color: Colors.white70),
+                  style: TextStyle(color: Color(0xFF59452B)),
                 ),
                 Text(
                   '${formatCount(dailyCount)} / 1,000',
@@ -518,18 +563,18 @@ class _StoryPageState extends State<StoryPage> {
               child: LinearProgressIndicator(
                 value: (dailyCount / dailyTarget).clamp(0.0, 1.0),
                 minHeight: 10,
-                backgroundColor: Colors.white12,
+                backgroundColor: const Color(0xFFD8CEB8),
                 valueColor: AlwaysStoppedAnimation<Color>(accent),
               ),
             ),
 
             const SizedBox(height: 18),
 
-            Text(
+            const Text(
               'هل تعلم كم مرة صلّيت على محمد وآل محمد؟',
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: Color(0xFF59452B),
                 fontSize: 15,
                 height: 1.7,
               ),
@@ -551,7 +596,7 @@ class _StoryPageState extends State<StoryPage> {
             const Text(
               'صلاة على محمد وآل محمد',
               style: TextStyle(
-                color: Colors.white70,
+                color: Color(0xFF806B50),
                 fontSize: 13,
               ),
             ),
@@ -561,12 +606,306 @@ class _StoryPageState extends State<StoryPage> {
     );
   }
 
+  // تحميل الرسومات المحفوظة.
+  Future<void> loadDrawing() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(drawingKey);
+
+      if (saved == null || saved.isEmpty) return;
+
+      final decoded = jsonDecode(saved) as List<dynamic>;
+
+      final strokes = decoded
+          .map(
+            (item) => _DrawStroke.fromJson(
+              Map<String, dynamic>.from(item as Map),
+            ),
+          )
+          .toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        drawingStrokes
+          ..clear()
+          ..addAll(strokes);
+      });
+    } catch (_) {
+      // لا يتوقف التطبيق إذا تعذر تحميل الرسم.
+    }
+  }
+
+  // حفظ الرسومات تلقائياً.
+  Future<void> saveDrawing() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      final encoded = jsonEncode(
+        drawingStrokes.map((stroke) => stroke.toJson()).toList(),
+      );
+
+      await prefs.setString(drawingKey, encoded);
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذر حفظ الرسم'),
+        ),
+      );
+    }
+  }
+
+  void startDrawing(DragStartDetails details) {
+    setState(() {
+      drawingStrokes.add(
+        _DrawStroke(
+          points: [details.localPosition],
+          color: drawingColor,
+          width: drawingWidth,
+        ),
+      );
+    });
+  }
+
+  void continueDrawing(DragUpdateDetails details) {
+    if (drawingStrokes.isEmpty) return;
+
+    setState(() {
+      drawingStrokes.last.points.add(details.localPosition);
+    });
+  }
+
+  Future<void> finishDrawing(DragEndDetails details) async {
+    await saveDrawing();
+  }
+
+  Future<void> clearDrawing() async {
+    if (drawingStrokes.isEmpty) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: cardBackground,
+        title: Text(
+          'مسح لوحة الرسم',
+          style: TextStyle(color: accent),
+          textAlign: TextAlign.center,
+        ),
+        content: Text(
+          'هل تريد مسح جميع الرسومات؟',
+          style: TextStyle(color: textColor),
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(
+              'إلغاء',
+              style: TextStyle(color: secondaryText),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              'مسح',
+              style: TextStyle(color: accent),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    setState(() {
+      drawingStrokes.clear();
+    });
+
+    await saveDrawing();
+  }
+
+  Widget buildDrawingBoard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardBackground,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: accent,
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.12),
+            blurRadius: 12,
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.draw_outlined,
+                color: accent,
+                size: 24,
+              ),
+              const SizedBox(width: 9),
+              Text(
+                'لوحة الرسم',
+                style: TextStyle(
+                  color: accent,
+                  fontSize: 21,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                onPressed: clearDrawing,
+                tooltip: 'مسح الرسم',
+                icon: Icon(
+                  Icons.delete_outline,
+                  color: accent,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 10),
+
+          Container(
+            height: 280,
+            width: double.infinity,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF080808)
+                  : const Color(0xFFFFFEFA),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: accent.withValues(alpha: 0.55),
+                width: 1,
+              ),
+            ),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onPanStart: startDrawing,
+              onPanUpdate: continueDrawing,
+              onPanEnd: finishDrawing,
+              child: CustomPaint(
+                painter: _DrawingPainter(drawingStrokes),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 15),
+
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              'لون القلم',
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 13,
+            runSpacing: 12,
+            children: drawingColors.map((color) {
+              final selected =
+                  drawingColor.toARGB32() == color.toARGB32();
+
+              return GestureDetector(
+                onTap: () {
+                  setState(() {
+                    drawingColor = color;
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected ? accent : Colors.transparent,
+                      width: 3,
+                    ),
+                  ),
+                  child: selected
+                      ? const Icon(
+                          Icons.check,
+                          color: Colors.black,
+                          size: 18,
+                        )
+                      : null,
+                ),
+              );
+            }).toList(),
+          ),
+
+          const SizedBox(height: 12),
+
+          Row(
+            children: [
+              Text(
+                'سُمك القلم',
+                style: TextStyle(color: textColor),
+              ),
+              Expanded(
+                child: Slider(
+                  value: drawingWidth,
+                  min: 2,
+                  max: 12,
+                  divisions: 10,
+                  activeColor: accent,
+                  onChanged: (value) {
+                    setState(() {
+                      drawingWidth = value;
+                    });
+                  },
+                ),
+              ),
+              Text(
+                drawingWidth.toStringAsFixed(0),
+                style: TextStyle(
+                  color: accent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 5),
+
+          Text(
+            'رسوماتك محفوظة تلقائياً على جهازك',
+            style: TextStyle(
+              color: secondaryText,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget buildStoryCard() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF101010),
+        color: cardBackground,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: accent,
@@ -600,9 +939,9 @@ class _StoryPageState extends State<StoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: pageBackground,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: pageBackground,
         foregroundColor: accent,
         elevation: 0,
         centerTitle: true,
@@ -639,7 +978,11 @@ class _StoryPageState extends State<StoryPage> {
               else
                 buildTasbihDevice(),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 25),
+
+              buildDrawingBoard(),
+
+              const SizedBox(height: 25),
 
               buildStoryCard(),
             ],
@@ -647,5 +990,100 @@ class _StoryPageState extends State<StoryPage> {
         ),
       ),
     );
+  }
+}
+
+// بيانات كل خط مرسوم.
+class _DrawStroke {
+  final List<Offset> points;
+  final Color color;
+  final double width;
+
+  _DrawStroke({
+    required this.points,
+    required this.color,
+    required this.width,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'points': points.map((point) {
+        return {
+          'x': point.dx,
+          'y': point.dy,
+        };
+      }).toList(),
+      'color': color.toARGB32(),
+      'width': width,
+    };
+  }
+
+  factory _DrawStroke.fromJson(Map<String, dynamic> json) {
+    final rawPoints = json['points'] as List<dynamic>;
+
+    return _DrawStroke(
+      points: rawPoints.map((point) {
+        final data = Map<String, dynamic>.from(point as Map);
+
+        return Offset(
+          (data['x'] as num).toDouble(),
+          (data['y'] as num).toDouble(),
+        );
+      }).toList(),
+      color: Color((json['color'] as num).toInt()),
+      width: (json['width'] as num).toDouble(),
+    );
+  }
+}
+
+// رسام اللوحة.
+class _DrawingPainter extends CustomPainter {
+  final List<_DrawStroke> strokes;
+
+  _DrawingPainter(this.strokes);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final stroke in strokes) {
+      if (stroke.points.isEmpty) continue;
+
+      final paint = Paint()
+        ..color = stroke.color
+        ..strokeWidth = stroke.width
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.stroke;
+
+      if (stroke.points.length == 1) {
+        canvas.drawCircle(
+          stroke.points.first,
+          stroke.width / 2,
+          Paint()
+            ..color = stroke.color
+            ..style = PaintingStyle.fill,
+        );
+        continue;
+      }
+
+      final path = Path()
+        ..moveTo(
+          stroke.points.first.dx,
+          stroke.points.first.dy,
+        );
+
+      for (int i = 1; i < stroke.points.length; i++) {
+        path.lineTo(
+          stroke.points[i].dx,
+          stroke.points[i].dy,
+        );
+      }
+
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DrawingPainter oldDelegate) {
+    return true;
   }
 }
