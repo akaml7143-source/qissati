@@ -4,14 +4,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'screens/story_page.dart';
 import 'screens/settings_page.dart';
+import 'screens/auth_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // تهيئة Firebase
   await Firebase.initializeApp();
 
   SystemChrome.setSystemUIOverlayStyle(
@@ -40,14 +41,6 @@ class MyStoryAppState extends State<MyStoryApp> {
   Locale locale = const Locale('ar');
 
   bool _isLoading = true;
-
-  final List<Color> colors = const [
-    Color(0xFFD4AF37),
-    Color(0xFF176B70),
-    Color(0xFF303B78),
-    Color(0xFF1B4332),
-    Color(0xFF7B263A),
-  ];
 
   @override
   void initState() {
@@ -109,22 +102,16 @@ class MyStoryAppState extends State<MyStoryApp> {
 
       await prefs.setDouble('moon_font_size', fontSize);
       await prefs.setString('moon_language', locale.languageCode);
-    } catch (_) {
-      // يبقى التطبيق يعمل حتى لو تعذر حفظ الإعدادات.
-    }
+    } catch (_) {}
   }
 
   void changeTheme(ThemeMode value) {
-    setState(() {
-      themeMode = value;
-    });
+    setState(() => themeMode = value);
     _saveSettings();
   }
 
   void changeColor(Color value) {
-    setState(() {
-      accentColor = value;
-    });
+    setState(() => accentColor = value);
     _saveSettings();
   }
 
@@ -136,10 +123,75 @@ class MyStoryAppState extends State<MyStoryApp> {
   }
 
   void changeLanguage(String value) {
-    setState(() {
-      locale = Locale(value);
-    });
+    setState(() => locale = Locale(value));
     _saveSettings();
+  }
+
+  Widget _buildHome() {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFFD4AF37),
+          ),
+        ),
+      );
+    }
+
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            backgroundColor: Colors.black,
+            body: Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFFD4AF37),
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return const Scaffold(
+            backgroundColor: Colors.black,
+            body: Center(
+              child: Text(
+                'تعذر التحقق من الحساب. تحقق من اتصال الإنترنت.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.data == null) {
+          return const AuthPage();
+        }
+
+        return StoryPage(
+          accentColor: accentColor,
+          fontSize: fontSize,
+          onSettings: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => SettingsPage(
+                  themeMode: themeMode,
+                  accentColor: accentColor,
+                  fontSize: fontSize,
+                  onThemeChanged: changeTheme,
+                  onColorChanged: changeColor,
+                  onFontChanged: changeFontSize,
+                  onLanguageChanged: changeLanguage,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -199,35 +251,7 @@ class MyStoryAppState extends State<MyStoryApp> {
       themeMode: themeMode,
       theme: lightTheme,
       darkTheme: darkTheme,
-      home: _isLoading
-          ? const Scaffold(
-              backgroundColor: Colors.black,
-              body: Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFFD4AF37),
-                ),
-              ),
-            )
-          : StoryPage(
-              accentColor: accentColor,
-              fontSize: fontSize,
-              onSettings: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => SettingsPage(
-                      themeMode: themeMode,
-                      accentColor: accentColor,
-                      fontSize: fontSize,
-                      onThemeChanged: changeTheme,
-                      onColorChanged: changeColor,
-                      onFontChanged: changeFontSize,
-                      onLanguageChanged: changeLanguage,
-                    ),
-                  ),
-                );
-              },
-            ),
+      home: _buildHome(),
     );
   }
 }
