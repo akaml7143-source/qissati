@@ -27,10 +27,6 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  static const Color gold = Color(0xFFD4AF37);
-  static const Color background = Colors.black;
-  static const Color cardColor = Color(0xFF111111);
-
   late ThemeMode selectedTheme;
   late Color selectedColor;
   late double selectedFontSize;
@@ -52,8 +48,37 @@ class _SettingsPageState extends State<SettingsPage> {
     selectedFontSize = widget.fontSize;
   }
 
+  @override
+  void didUpdateWidget(covariant SettingsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    selectedTheme = widget.themeMode;
+    selectedColor = widget.accentColor;
+    selectedFontSize = widget.fontSize;
+  }
+
   bool get isArabic =>
       Localizations.localeOf(context).languageCode == 'ar';
+
+  bool get isDark =>
+      Theme.of(context).brightness == Brightness.dark;
+
+  Color get accent => selectedColor;
+
+  Color get background =>
+      isDark ? Colors.black : const Color(0xFFFFFDF7);
+
+  Color get cardColor =>
+      isDark ? const Color(0xFF111111) : const Color(0xFFF1EEE6);
+
+  Color get primaryText =>
+      isDark ? Colors.white : Colors.black87;
+
+  Color get secondaryText =>
+      isDark ? Colors.white70 : Colors.black54;
+
+  Color get dividerColor =>
+      accent.withValues(alpha: 0.22);
 
   String tr(String ar, String en) => isArabic ? ar : en;
 
@@ -77,13 +102,16 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void comingSoon(String title) {
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: cardColor,
         title: Text(
           title,
-          style: const TextStyle(color: gold),
+          style: TextStyle(
+            color: accent,
+            fontWeight: FontWeight.bold,
+          ),
           textAlign: TextAlign.center,
         ),
         content: Text(
@@ -91,15 +119,15 @@ class _SettingsPageState extends State<SettingsPage> {
             'هذا القسم سنفعّله في المرحلة القادمة بعد تجهيز وظيفته.',
             'This section will be enabled in a future development stage.',
           ),
-          style: const TextStyle(color: Colors.white70),
+          style: TextStyle(color: secondaryText),
           textAlign: TextAlign.center,
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text(
               tr('حسناً', 'OK'),
-              style: const TextStyle(color: gold),
+              style: TextStyle(color: accent),
             ),
           ),
         ],
@@ -112,12 +140,12 @@ class _SettingsPageState extends State<SettingsPage> {
       padding: const EdgeInsets.only(top: 25, bottom: 12),
       child: Row(
         children: [
-          Icon(icon, color: gold, size: 22),
+          Icon(icon, color: accent, size: 22),
           const SizedBox(width: 10),
           Text(
             title,
-            style: const TextStyle(
-              color: gold,
+            style: TextStyle(
+              color: accent,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
@@ -133,7 +161,7 @@ class _SettingsPageState extends State<SettingsPage> {
         color: cardColor,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: gold.withValues(alpha: 0.35),
+          color: accent.withValues(alpha: 0.35),
         ),
       ),
       child: Column(children: children),
@@ -148,11 +176,11 @@ class _SettingsPageState extends State<SettingsPage> {
     Widget? trailing,
   }) {
     return ListTile(
-      leading: Icon(icon, color: gold),
+      leading: Icon(icon, color: accent),
       title: Text(
         title,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: primaryText,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -160,12 +188,14 @@ class _SettingsPageState extends State<SettingsPage> {
           ? null
           : Text(
               subtitle,
-              style: const TextStyle(color: Colors.white54),
+              style: TextStyle(color: secondaryText),
             ),
       trailing: trailing ??
-          const Icon(
-            Icons.arrow_forward_ios,
-            color: Colors.white38,
+          Icon(
+            isArabic
+                ? Icons.arrow_back_ios
+                : Icons.arrow_forward_ios,
+            color: secondaryText,
             size: 16,
           ),
       onTap: onTap,
@@ -177,31 +207,25 @@ class _SettingsPageState extends State<SettingsPage> {
       RadioListTile<ThemeMode>(
         value: ThemeMode.dark,
         groupValue: selectedTheme,
-        activeColor: gold,
-        secondary: const Icon(
-          Icons.dark_mode,
-          color: gold,
-        ),
+        activeColor: accent,
+        secondary: Icon(Icons.dark_mode, color: accent),
         title: Text(
           tr('الوضع الليلي', 'Dark mode'),
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: primaryText),
         ),
         onChanged: (value) {
           if (value != null) selectTheme(value);
         },
       ),
-      const Divider(color: Colors.white12, height: 1),
+      Divider(color: dividerColor, height: 1),
       RadioListTile<ThemeMode>(
         value: ThemeMode.light,
         groupValue: selectedTheme,
-        activeColor: gold,
-        secondary: const Icon(
-          Icons.light_mode,
-          color: gold,
-        ),
+        activeColor: accent,
+        secondary: Icon(Icons.light_mode, color: accent),
         title: Text(
           tr('الوضع النهاري', 'Light mode'),
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: primaryText),
         ),
         onChanged: (value) {
           if (value != null) selectTheme(value);
@@ -211,6 +235,10 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget buildColors() {
+    final colorNames = isArabic
+        ? ['ذهبي', 'وردي', 'فيروزي', 'كحلي', 'أخضر', 'عنابي']
+        : ['Gold', 'Pink', 'Teal', 'Indigo', 'Green', 'Maroon'];
+
     return settingsCard([
       Padding(
         padding: const EdgeInsets.all(17),
@@ -218,39 +246,58 @@ class _SettingsPageState extends State<SettingsPage> {
           alignment: WrapAlignment.center,
           spacing: 18,
           runSpacing: 18,
-          children: colors.map((color) {
+          children: List.generate(colors.length, (index) {
+            final color = colors[index];
+
             final selected =
                 color.toARGB32() == selectedColor.toARGB32();
 
             return GestureDetector(
               onTap: () => selectColor(color),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: selected ? Colors.white : Colors.transparent,
-                    width: 3,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.3),
-                      blurRadius: selected ? 10 : 3,
+              child: SizedBox(
+                width: 65,
+                child: Column(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: selected
+                              ? primaryText
+                              : Colors.transparent,
+                          width: 3,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.3),
+                            blurRadius: selected ? 10 : 3,
+                          ),
+                        ],
+                      ),
+                      child: selected
+                          ? const Icon(
+                              Icons.check,
+                              color: Colors.white,
+                            )
+                          : null,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      colorNames[index],
+                      style: TextStyle(
+                        color: secondaryText,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
-                child: selected
-                    ? const Icon(
-                        Icons.check,
-                        color: Colors.white,
-                      )
-                    : null,
               ),
             );
-          }).toList(),
+          }),
         ),
       ),
     ]);
@@ -264,8 +311,8 @@ class _SettingsPageState extends State<SettingsPage> {
           children: [
             Text(
               tr('معاينة حجم الخط', 'Font size preview'),
-              style: const TextStyle(
-                color: Colors.white70,
+              style: TextStyle(
+                color: secondaryText,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -274,7 +321,7 @@ class _SettingsPageState extends State<SettingsPage> {
               tr('لكل منا قصة جميلة', 'Everyone has a story'),
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white,
+                color: primaryText,
                 fontSize: selectedFontSize,
               ),
             ),
@@ -283,22 +330,22 @@ class _SettingsPageState extends State<SettingsPage> {
               min: 16,
               max: 32,
               divisions: 16,
-              activeColor: gold,
-              inactiveColor: Colors.white24,
+              activeColor: accent,
+              inactiveColor: secondaryText.withValues(alpha: 0.25),
               label: selectedFontSize.round().toString(),
               onChanged: selectFont,
             ),
             Text(
               '${selectedFontSize.round()}',
-              style: const TextStyle(
-                color: gold,
+              style: TextStyle(
+                color: accent,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ],
         ),
       ),
-      const Divider(color: Colors.white12, height: 1),
+      Divider(color: dividerColor, height: 1),
       settingTile(
         icon: Icons.font_download_outlined,
         title: tr('نوع الخط', 'Font style'),
@@ -306,7 +353,9 @@ class _SettingsPageState extends State<SettingsPage> {
           'الخط النسخي - قيد التجهيز',
           'Naskh font - being prepared',
         ),
-        onTap: () => comingSoon(tr('نوع الخط', 'Font style')),
+        onTap: () => comingSoon(
+          tr('نوع الخط', 'Font style'),
+        ),
       ),
     ]);
   }
@@ -318,24 +367,24 @@ class _SettingsPageState extends State<SettingsPage> {
     return settingsCard([
       ListTile(
         leading: const Text('🇮🇶', style: TextStyle(fontSize: 25)),
-        title: const Text(
+        title: Text(
           'العربية',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: primaryText),
         ),
         trailing: currentLanguage == 'ar'
-            ? const Icon(Icons.check_circle, color: gold)
+            ? Icon(Icons.check_circle, color: accent)
             : null,
         onTap: () => selectLanguage('ar'),
       ),
-      const Divider(color: Colors.white12, height: 1),
+      Divider(color: dividerColor, height: 1),
       ListTile(
         leading: const Text('🇬🇧', style: TextStyle(fontSize: 25)),
-        title: const Text(
+        title: Text(
           'English',
-          style: TextStyle(color: Colors.white),
+          style: TextStyle(color: primaryText),
         ),
         trailing: currentLanguage == 'en'
-            ? const Icon(Icons.check_circle, color: gold)
+            ? Icon(Icons.check_circle, color: accent)
             : null,
         onTap: () => selectLanguage('en'),
       ),
@@ -355,7 +404,7 @@ class _SettingsPageState extends State<SettingsPage> {
           tr('الخصوصية والأمان', 'Privacy and security'),
         ),
       ),
-      const Divider(color: Colors.white12, height: 1),
+      Divider(color: dividerColor, height: 1),
       settingTile(
         icon: Icons.notifications_none,
         title: tr('الإشعارات', 'Notifications'),
@@ -367,7 +416,7 @@ class _SettingsPageState extends State<SettingsPage> {
           tr('الإشعارات', 'Notifications'),
         ),
       ),
-      const Divider(color: Colors.white12, height: 1),
+      Divider(color: dividerColor, height: 1),
       settingTile(
         icon: Icons.account_circle_outlined,
         title: tr('الحساب والملف الشخصي', 'Account and profile'),
@@ -375,7 +424,7 @@ class _SettingsPageState extends State<SettingsPage> {
           tr('الحساب والملف الشخصي', 'Account and profile'),
         ),
       ),
-      const Divider(color: Colors.white12, height: 1),
+      Divider(color: dividerColor, height: 1),
       settingTile(
         icon: Icons.storage_outlined,
         title: tr('الملفات ومساحة التخزين', 'Files and storage'),
@@ -383,7 +432,7 @@ class _SettingsPageState extends State<SettingsPage> {
           tr('الملفات ومساحة التخزين', 'Files and storage'),
         ),
       ),
-      const Divider(color: Colors.white12, height: 1),
+      Divider(color: dividerColor, height: 1),
       settingTile(
         icon: Icons.info_outline,
         title: tr('حول التطبيق', 'About'),
@@ -410,7 +459,7 @@ class _SettingsPageState extends State<SettingsPage> {
         backgroundColor: background,
         appBar: AppBar(
           backgroundColor: background,
-          foregroundColor: gold,
+          foregroundColor: accent,
           elevation: 0,
           centerTitle: true,
           title: Text(
@@ -426,20 +475,23 @@ class _SettingsPageState extends State<SettingsPage> {
               decoration: BoxDecoration(
                 color: cardColor,
                 borderRadius: BorderRadius.circular(17),
-                border: Border.all(color: gold, width: 1.3),
+                border: Border.all(
+                  color: accent,
+                  width: 1.3,
+                ),
               ),
-              child: const Column(
+              child: Column(
                 children: [
                   Icon(
                     Icons.nightlight_round,
-                    color: gold,
+                    color: accent,
                     size: 43,
                   ),
-                  SizedBox(height: 9),
+                  const SizedBox(height: 9),
                   Text(
                     'moon',
                     style: TextStyle(
-                      color: gold,
+                      color: accent,
                       fontSize: 25,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 3,
@@ -484,7 +536,7 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Text(
                 'moon',
                 style: TextStyle(
-                  color: selectedColor,
+                  color: accent,
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 3,
