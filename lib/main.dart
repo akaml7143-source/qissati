@@ -10,6 +10,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'screens/story_page.dart';
 import 'screens/settings_page.dart';
 import 'screens/auth_page.dart';
+import 'screens/chat_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,16 +33,17 @@ class MyStoryApp extends StatefulWidget {
   const MyStoryApp({super.key});
 
   @override
-  State<MyStoryApp> createState() => MyStoryAppState();
+  State<MyStoryApp> createState() => _MyStoryAppState();
 }
 
-class MyStoryAppState extends State<MyStoryApp> {
+class _MyStoryAppState extends State<MyStoryApp> {
   ThemeMode themeMode = ThemeMode.dark;
   Color accentColor = const Color(0xFFD4AF37);
   double fontSize = 19;
   Locale locale = const Locale('ar');
 
   bool _isLoading = true;
+  bool _openingChat = false;
 
   @override
   void initState() {
@@ -125,6 +127,161 @@ class MyStoryAppState extends State<MyStoryApp> {
     _saveSettings();
   }
 
+  void openSettings() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SettingsPage(
+          themeMode: themeMode,
+          accentColor: accentColor,
+          fontSize: fontSize,
+          onThemeChanged: changeTheme,
+          onColorChanged: changeColor,
+          onFontChanged: changeFontSize,
+          onLanguageChanged: changeLanguage,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showWaitingApproval() async {
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF191919),
+          icon: const Icon(
+            Icons.hourglass_top_rounded,
+            color: Color(0xFFD4AF37),
+            size: 45,
+          ),
+          title: const Text(
+            'حسابك بانتظار الموافقة',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFFD4AF37)),
+          ),
+          content: const Text(
+            'تم تسجيل الدخول بنجاح، لكن عضويتك لم تُفعّل بعد. '
+            'يرجى انتظار موافقة مالك التطبيق.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white70,
+              height: 1.7,
+            ),
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await FirebaseAuth.instance.signOut();
+              },
+              child: const Text(
+                'تسجيل الخروج',
+                style: TextStyle(color: Color(0xFFD4AF37)),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text(
+                'إغلاق',
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _openChatPortal() async {
+    if (_openingChat) return;
+
+    setState(() => _openingChat = true);
+
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+
+      // إذا لم يكن المستخدم مسجلاً، نفتح صفحة الدخول.
+      if (user == null) {
+        final result = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const AuthPage(),
+          ),
+        );
+
+        if (!mounted || result != true) return;
+
+        user = FirebaseAuth.instance.currentUser;
+      }
+
+      if (user == null || !mounted) return;
+
+      // فحص موافقة العضوية من Firestore.
+      final memberDocument = await FirebaseFirestore.instance
+          .collection('members')
+          .doc(user.uid)
+          .get();
+
+      if (!mounted) return;
+
+      final memberData = memberDocument.data();
+      final isActive = memberData?['active'] == true;
+
+      if (!isActive) {
+        await _showWaitingApproval();
+        return;
+      }
+
+      // فتح المحادثة بعد التأكد من تفعيل العضوية.
+      if (!mounted) return;
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatPage(
+            accentColor: accentColor,
+            fontSize: fontSize,
+          ),
+        ),
+      );
+    } on FirebaseAuthException {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذّر التحقق من الحساب. حاول مرة أخرى.'),
+        ),
+      );
+    } on FirebaseException {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'تعذّر الاتصال بخدمة العضوية. تحقق من الإنترنت وحاول مجدداً.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('حدث خطأ. حاول مرة أخرى.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _openingChat = false);
+      }
+    }
+  }
+
   Widget _loadingPage() {
     return const Scaffold(
       backgroundColor: Colors.black,
@@ -133,156 +290,6 @@ class MyStoryAppState extends State<MyStoryApp> {
           color: Color(0xFFD4AF37),
         ),
       ),
-    );
-  }
-
-  Widget _messagePage(
-    String title,
-    String message, {
-    bool showSignOut = false,
-    bool showRetry = false,
-  }) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.nightlight_round,
-                color: Color(0xFFD4AF37),
-                size: 65,
-              ),
-              const SizedBox(height: 22),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFFD4AF37),
-                  fontSize: 23,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                  height: 1.8,
-                ),
-              ),
-              const SizedBox(height: 25),
-              if (showRetry)
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {});
-                  },
-                  child: const Text('إعادة المحاولة'),
-                ),
-              if (showSignOut)
-                TextButton(
-                  onPressed: () async {
-                    await FirebaseAuth.instance.signOut();
-                  },
-                  child: const Text(
-                    'تسجيل الخروج',
-                    style: TextStyle(color: Color(0xFFD4AF37)),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMembershipGate(User user) {
-    return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      future: FirebaseFirestore.instance
-          .collection('members')
-          .doc(user.uid)
-          .get(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _loadingPage();
-        }
-
-        if (snapshot.hasError) {
-          return _messagePage(
-            'تعذّر التحقق',
-            'تحقق من اتصال الإنترنت ثم أعد المحاولة.',
-            showSignOut: true,
-            showRetry: true,
-          );
-        }
-
-        final memberData = snapshot.data?.data();
-        final isActive = memberData?['active'] == true;
-
-        if (!isActive) {
-          return _messagePage(
-            'حسابك بانتظار الموافقة',
-            'تم تسجيل الدخول بنجاح، لكن عضويتك لم تُفعّل بعد. '
-                'يرجى انتظار موافقة مالك التطبيق.',
-            showSignOut: true,
-          );
-        }
-
-        return StoryPage(
-          accentColor: accentColor,
-          fontSize: fontSize,
-          onSettings: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SettingsPage(
-                  themeMode: themeMode,
-                  accentColor: accentColor,
-                  fontSize: fontSize,
-                  onThemeChanged: changeTheme,
-                  onColorChanged: changeColor,
-                  onFontChanged: changeFontSize,
-                  onLanguageChanged: changeLanguage,
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildHome() {
-    if (_isLoading) {
-      return _loadingPage();
-    }
-
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _loadingPage();
-        }
-
-        if (snapshot.hasError) {
-          return _messagePage(
-            'تعذّر التحقق من الحساب',
-            'تحقق من اتصال الإنترنت وحاول مرة أخرى.',
-          );
-        }
-
-        final user = snapshot.data;
-
-        if (user == null) {
-          return const AuthPage();
-        }
-
-        return _buildMembershipGate(user);
-      },
     );
   }
 
@@ -343,7 +350,14 @@ class MyStoryAppState extends State<MyStoryApp> {
       themeMode: themeMode,
       theme: lightTheme,
       darkTheme: darkTheme,
-      home: _buildHome(),
+      home: _isLoading
+          ? _loadingPage()
+          : StoryPage(
+              accentColor: accentColor,
+              fontSize: fontSize,
+              onSettings: openSettings,
+              onOpenChat: _openChatPortal,
+            ),
     );
   }
 }
