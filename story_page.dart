@@ -661,12 +661,6 @@ class _StoryPageState extends State<StoryPage> {
           TextSpan(
             text: 'طبيب',
             recognizer: doctorTap,
-            style: const TextStyle(
-              color: gold,
-              fontWeight: FontWeight.bold,
-              decoration: TextDecoration.underline,
-              decorationColor: gold,
-            ),
           ),
         );
       }
